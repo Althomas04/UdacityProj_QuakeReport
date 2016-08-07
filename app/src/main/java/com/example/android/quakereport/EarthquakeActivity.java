@@ -1,8 +1,9 @@
 package com.example.android.quakereport;
 
+import android.app.LoaderManager;
 import android.content.Intent;
+import android.content.Loader;
 import android.net.Uri;
-import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.view.View;
@@ -12,21 +13,37 @@ import android.widget.ListView;
 import java.util.ArrayList;
 import java.util.List;
 
-public class EarthquakeActivity extends AppCompatActivity {
+public class EarthquakeActivity extends AppCompatActivity implements LoaderManager.LoaderCallbacks<List<quakeInfo>> {
 
     /** URL for earthquake data from the USGS dataset */
-    /** JSON response for a USGS query */
+    /**
+     * JSON response for a USGS query
+     */
     private static final String USGS_REQUEST_URL = "http://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&eventtype=earthquake&orderby=time&minmag=6&limit=10";
 
-    /** Adapter for the list of earthquakes */
+    /**
+     * Adapter for the list of earthquakes
+     */
     private QuakeAdapter mAdapter;
+
+    /**
+     * Constant value for the earthquake loader ID. We can choose any integer.
+     * This really only comes into play if you're using multiple loaders.
+     */
+    private static final int EARTHQUAKE_LOADER_ID = 1;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.earthquake_activity);
 
-        new EarthquakeAsyncTask().execute(USGS_REQUEST_URL);
+        // Get a reference to the LoaderManager, in order to interact with loaders.
+        LoaderManager loaderManager = getLoaderManager();
+
+        // Initialize the loader. Pass in the int ID constant defined above and pass in null for
+        // the bundle. Pass in this activity for the LoaderCallbacks parameter (which is valid
+        // because this activity implements the LoaderCallbacks interface).
+        loaderManager.initLoader(EARTHQUAKE_LOADER_ID, null, this);
 
         // Create a empty list of earthquake info.
         ArrayList<quakeInfo> earthquakesArrayList = new ArrayList<quakeInfo>();
@@ -60,27 +77,28 @@ public class EarthquakeActivity extends AppCompatActivity {
             }
         });
     }
-    private class EarthquakeAsyncTask extends AsyncTask<String, Void,List<quakeInfo>> {
-        @Override
-        protected List<quakeInfo> doInBackground(String... url){
 
-            // Don't perform the request if there are no URLs, or the first URL is null.
-            if (url.length < 1 || url[0] == null) {
-                return null;
-            }
-            // Perform the HTTP request for earthquake data and process the response if url exists.
-            List<quakeInfo> earthquake = QueryUtils.fetchEarthquakeData(url[0]);
-            return earthquake;
-        }
-        protected void onPostExecute(List<quakeInfo> earthquakeResult){
-            // Clear the adapter of previous earthquake data
-            mAdapter.clear();
+    @Override
+    public Loader<List<quakeInfo>> onCreateLoader(int i, Bundle bundle) {
+        // Create a new loader for the given URL
+        return new EarthquakeLoader(this, USGS_REQUEST_URL);
+    }
 
-            // If there is a valid list of {@link Earthquake}s, then add them to the adapter's
-            // data set. This will trigger the ListView to update.
-            if (earthquakeResult != null && !earthquakeResult.isEmpty()) {
-                mAdapter.addAll(earthquakeResult);
-            }
+    @Override
+    public void onLoadFinished(Loader<List<quakeInfo>> loader, List<quakeInfo> earthquakes) {
+        // Clear the adapter of previous earthquake data
+        mAdapter.clear();
+
+        // If there is a valid list of {@link Earthquake}s, then add them to the adapter's
+        // data set. This will trigger the ListView to update.
+        if (earthquakes != null && !earthquakes.isEmpty()) {
+            mAdapter.addAll(earthquakes);
         }
+    }
+
+    @Override
+    public void onLoaderReset(Loader<List<quakeInfo>> loader) {
+        // Loader reset, so we can clear out our existing data.
+        mAdapter.clear();
     }
 }
